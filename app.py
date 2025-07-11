@@ -5,27 +5,27 @@ import time
 
 st.set_page_config(page_title="Nifty Option Screener", layout="wide")
 
-# 🔄 Auto refresh every 3 minutes
-def auto_refresh(interval_sec=180):
+# 🔄 Auto refresh every 1 minutes
+def auto_refresh(interval_sec=60):
     if "last_refresh" not in st.session_state:
         st.session_state["last_refresh"] = time.time()
     if time.time() - st.session_state["last_refresh"] > interval_sec:
         st.session_state["last_refresh"] = time.time()
         st.rerun()
 
-auto_refresh(180)
+auto_refresh(60)
 
 st.title("📊 NIFTY Option Screener – Fijacapital")
-st.markdown("⏰ Auto-refresh every 3 minutes | 🔄 Live NSE Option Chain Analysis")
+st.markdown("⏰ Auto-refresh every 1 minutes | 🔄 Live NSE Option Chain Analysis")
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=180)
 def fetch_option_chain():
     url = "https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
         s = requests.Session()
         s.get("https://www.nseindia.com", headers=headers)
-        r = s.get(url, headers=headers, timeout=10)
+        r = s.get(url, headers=headers, timeout=3)
         return r.json()
     except:
         st.warning("⚠️ Could not fetch data from NSE. Try again later.")
