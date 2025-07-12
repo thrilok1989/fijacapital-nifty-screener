@@ -182,6 +182,52 @@ with col1:
 with col2:
     st.success(f"📈 Strong Resistance at **{int(resistance_strike)}** (CALL OI + Vol)")
 
+# 📊 Smart Sentiment Detector
+st.markdown("### 🧠 Smart Sentiment Detector (Based on Premium + OI + IV)")
+
+sentiments = []
+
+# 1. Call Premium > Fair (assume Fair IV = 12.5)
+if merged_df["IV_CE"].mean() > 15:
+    sentiments.append("📈 **Call Premium > Fair Value** → বাজার Up যেতে পারে")
+
+# 2. Put Premium > Fair
+if merged_df["IV_PE"].mean() > 15:
+    sentiments.append("📉 **Put Premium > Fair Value** → বাজার Down যেতে পারে")
+
+# 3. IV rising
+if merged_df["IV_CE"].mean() > 13 and merged_df["IV_PE"].mean() > 13:
+    sentiments.append("⚠️ **IV বাড়ছে** → বড় মুভ আসতে পারে")
+
+# 4. Call OI↑ + Premium↑ = Bullish
+if df_ce["Chg_OI_CE"].sum() > 0 and df_ce["Vol_CE"].sum() > 0:
+    sentiments.append("🟩 **Call OI↑ + Premium↑** → Smart money buying → Bullish")
+
+# 5. Put OI↑ + Premium↑ = Bearish
+if df_pe["Chg_OI_PE"].sum() > 0 and df_pe["Vol_PE"].sum() > 0:
+    sentiments.append("🟥 **Put OI↑ + Premium↑** → Smart money buying → Bearish")
+
+# 6. Call premium↑, OI↓ = Short covering
+if df_ce["Vol_CE"].sum() > 0 and df_ce["Chg_OI_CE"].sum() < 0:
+    sentiments.append("🔼 **Call প্রিমিয়াম↑, OI↓** → Short covering → Up move")
+
+# 7. Put premium↑, OI↓ = Put covering → bounce
+if df_pe["Vol_PE"].sum() > 0 and df_pe["Chg_OI_PE"].sum() < 0:
+    sentiments.append("🔼 **Put প্রিমিয়াম↑, OI↓** → Short covering → Up bounce")
+
+# 8. PCR Signal
+if pcr > 1.3:
+    sentiments.append("📗 **PCR > 1.3** → Bullish bias")
+elif pcr < 0.7:
+    sentiments.append("📕 **PCR < 0.7** → Bearish bias")
+
+# Final Output
+if sentiments:
+    for s in sentiments:
+        st.info(s)
+else:
+    st.warning("🤔 পর্যাপ্ত তথ্য নেই বাজার বিশ্লেষণের জন্য।")
+
 # 🤖 Auto Trade Suggestion
 st.markdown("### 🤖 Auto Trade Suggestion")
 
