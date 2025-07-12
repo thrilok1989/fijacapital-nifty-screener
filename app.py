@@ -101,7 +101,55 @@ merged_df = pd.merge(df_ce, df_pe, on="strikePrice", how="outer").sort_values("s
 # 🧾 Display Table
 st.markdown("### 🧾 Combined Option Chain (CALL + PUT Side-by-Side)")
 st.caption(f"📍 Spot: `{underlying}` | 🎯 ATM Strike: `{atm_strike}` | 📅 Expiry: `{selected_expiry}`")
-st.dataframe(merged_df, use_container_width=True)
+
+# 💸 Premium Analysis based on IV
+def price_tag(iv):
+    if iv < 10:
+        return "🟢 Cheap"
+    elif iv > 15:
+        return "🔴 Expensive"
+    else:
+        return "🟡 Fair"
+
+# Add dummy IV columns (can replace with live IV later)
+merged_df["IV_CE"] = 12.5  # ← Placeholder IV (Updateable)
+merged_df["IV_PE"] = 13.2
+
+merged_df["Price_Tag_CE"] = merged_df["IV_CE"].apply(price_tag)
+merged_df["Price_Tag_PE"] = merged_df["IV_PE"].apply(price_tag)
+
+# 🎨 Highlight Cheap/Expensive tags with color
+styled_df = merged_df.style.applymap(
+    lambda x: 'color: green' if x == '🟢 Cheap' else 'color: red' if x == '🔴 Expensive' else 'color: orange',
+    subset=["Price_Tag_CE", "Price_Tag_PE"]
+)
+
+st.dataframe(styled_df, use_container_width=True)
+
+# 🎨 Highlight Cheap/Expensive tags with color
+styled_df = merged_df.style.applymap(
+    lambda x: 'color: green' if x == '🟢 Cheap' else 'color: red' if x == '🔴 Expensive' else 'color: orange',
+    subset=["Price_Tag_CE", "Price_Tag_PE"]
+)
+
+st.dataframe(styled_df, use_container_width=True)
+
+
+# 💸 Premium Analysis based on IV
+def price_tag(iv):
+    if iv < 10:
+        return "🟢 Cheap"
+    elif iv > 15:
+        return "🔴 Expensive"
+    else:
+        return "🟡 Fair"
+
+# Add dummy IV columns (can replace with live IV later)
+merged_df["IV_CE"] = 12.5  # ← Placeholder, you can update later
+merged_df["IV_PE"] = 13.2  # ← Placeholder
+
+merged_df["Price_Tag_CE"] = merged_df["IV_CE"].apply(price_tag)
+merged_df["Price_Tag_PE"] = merged_df["IV_PE"].apply(price_tag)
 
 # 🔍 Breakout Zones
 df_ce_top = df_ce.sort_values(by="Chg_OI_CE", ascending=False).head(3)
