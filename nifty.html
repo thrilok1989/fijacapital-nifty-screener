@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nifty ATM SuperTrend - Live WebSocket</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #0d1421;
+            color: #ffffff;
+        }
+        .chart-container {
+            width: 100%;
+            height: 600px;
+            background-color: #131722;
+            border-radius: 8px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .control-group label {
+            font-size: 12px;
+            color: #787b86;
+        }
+        .config-section {
+            background-color: #2a2e39;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .config-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        select, input {
+            background-color: #2a2e39;
+            border: 1px solid #434651;
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #1976d2;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        .status-bar {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #787b86;
+            flex-wrap: wrap;
+        }
+        .status-item {
+            display: flex;
+            gap: 5px;
+        }
+        .status-value {
+            color: #ffffff;
+            font-weight: 500;
+        }
+        .price-positive {
+            color: #4caf50;
+        }
+        .price-negative {
+            color: #f44336;
+        }
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #4caf50;
+            color: white;
+        }
+        .disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+        .connecting {
+            background-color: #ff9800;
+            color: white;
+        }
+        .log-container {
+            background-color: #1e1e1e;
+            color: #ffffff;
+            padding: 10px;
+            border-radius: 4px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="connectionStatus" class="connection-status disconnected">Disconnected</div>
+    
+    <div class="header">
+        <div class="title">Nifty ATM Call SuperTrend - Live WebSocket</div>
+        <div class="controls">
+            <div class="control-group">
+                <label>SuperTrend Period</label>
+                <select id="stPeriod">
+                    <option value="10" selected>10</option>
+                    <option value="14">14</option>
+                    <option value="21">21</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>SuperTrend Multiplier</label>
+                <select id="stMultiplier">
+                    <option value="2">2.0</option>
+                    <option value="3" selected>3.0</option>
+                    <option value="4">4.0</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="config-section">
+        <h3 style="margin: 0 0 15px 0; color: #ffffff;">WebSocket Configuration</h3>
+        <div class="config-row">
+            <label>Access Token:</label>
+            <input type="password" id="accessToken" placeholder="Enter your DhanHQ access token" style="width: 300px;">
+        </div>
+        <div class="config-row">
+            <label>Client ID:</label>
+            <input type="text" id="clientId" placeholder="Enter your Client ID" style="width: 200px;">
+        </div>
+        <div class="config-row">
+            <button id="fetchStrikesBtn">Fetch Available Strikes</button>
+            <button id="manualEntryBtn">Manual Entry</button>
+            <label>Select Strike:</label>
+            <select id="strikeSelect" style="width: 200px;" disabled>
+                <option value="">First fetch strikes...</option>
+            </select>
+            <button id="connectBtn" disabled>Connect WebSocket</button>
+            <button id="disconnectBtn" disabled>Disconnect</button>
+        </div>
+        <div class="config-row" id="manualEntrySection" style="display: none;">
+            <label>Strike Price:</label>
+            <input type="text" id="manualStrike" placeholder="e.g., 24850" style="width: 100px;">
+            <label>Security ID:</label>
+            <input type="text" id="manualSecId" placeholder="e.g., 52175" style="width: 150px;">
+            <button id="addManualStrike">Add Strike</button>
+        </div>
+        <div class="config-row">
+            <label>Selected Security ID:</label>
+            <span id="selectedSecId" style="color: #4caf50; font-weight: bold;">None</span>
+            <label style="margin-left: 20px;">Current Expiry:</label>
+            <span id="currentExpiry" style="color: #4caf50; font-weight: bold;">Use manual entry</span>
+        </div>
+        <div style="font-size: 12px; color: #787b86; margin-top: 10px;">
+            <strong>Python Backend Method:</strong> Run python server (localhost:5000) for reliable API access. <strong>Manual Method:</strong> Enter strike and Security ID manually.
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #2196f3;"></div>
+            <span>ATM Call LTP</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #e91e63;"></div>
+            <span>SuperTrend Up</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #9c27b0;"></div>
+            <span>SuperTrend Down</span>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="optionsChart"></canvas>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <span>Last Update:</span>
+            <span class="status-value" id="lastUpdate">--</span>
+        </div>
+        <div class="status-item">
+            <span>ATM Strike:</span>
+            <span class="status-value" id="currentStrike">--</span>
+        </div>
+        <div class="status-item">
+            <span>ATM Call LTP:</span>
+            <span class="status-value" id="atmCallLtp">--</span>
+        </div>
+        <div class="status-item">
+            <span>SuperTrend Signal:</span>
+            <span class="status-value" id="stSignal">--</span>
+        </div>
+        <div class="status-item">
+            <span>Messages Received:</span>
+            <span class="status-value" id="msgCount">0</span>
+        </div>
+    </div>
+
+    <div class="log-container" id="logContainer">
+        <div>WebSocket logs will appear here...</div>
+    </div>
+
+    <script>
+        // Global variables
+        let chart;
+        let websocket = null;
+        let isConnected = false;
+        let messageCount = 0;
+        let atmCallSecurityId = null;
+        let availableStrikes = [];
+        let currentExpiry = null;
+        let selectedStrike = null;
+        
+        let optionsData = {
+            timestamps: [],
+            atmCallPrices: [],
+            superTrendUp: [],
+            superTrendDown: [],
+            high: [],
+            low: [],
+            close: []
+        };
+
+        // Initialize chart
+        function initChart() {
+            const ctx = document.getElementById('optionsChart').getContext('2d');
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: optionsData.timestamps,
+                    datasets: [
+                        {
+                            label: 'ATM Call LTP',
+                            data: optionsData.atmCallPrices,
+                            borderColor: '#2196f3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 1
+                        },
+                        {
+                            label: 'SuperTrend Up',
+                            data: optionsData.superTrendUp,
+                            borderColor: '#e91e63',
+                            backgroundColor: 'rgba(233, 30, 99, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'SuperTrend Down',
+                            data: optionsData.superTrendDown,
+                            borderColor: '#9c27b0',
+                            backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            grid: {
+                                color: '#2a2e39'
+                            },
+                            ticks: {
+                                color: '#787b86',
+                                callback: function(value, index) {
+                                    if (optionsData.timestamps[index]) {
+                                        return optionsData.timestamps[index];
+                                    }
+                                    return '';
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: '#2a2e39'
+                            },
+                            ticks: {
+                                color: '#787b86'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(19, 23, 34, 0.9)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#434651',
+                            borderWidth: 1
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        // Calculate ATR (Average True Range)
+        function calculateATR(high, low, close, period) {
+            const tr = [];
+            const atr = [];
+            
+            for (let i = 1; i < high.length; i++) {
+                const trueRange = Math.max(
+                    high[i] - low[i],
+                    Math.abs(high[i] - close[i - 1]),
+                    Math.abs(low[i] - close[i - 1])
+                );
+                tr.push(trueRange);
+            }
+            
+            // First ATR is simple average
+            let sum = 0;
+            for (let i = 0; i < Math.min(period, tr.length); i++) {
+                sum += tr[i];
+            }
+            atr.push(sum / Math.min(period, tr.length));
+            
+            // Subsequent ATR values use EMA
+            for (let i = period; i < tr.length; i++) {
+                const currentATR = (atr[atr.length - 1] * (period - 1) + tr[i]) / period;
+                atr.push(currentATR);
+            }
+            
+            return atr;
+        }
+
+        // Calculate SuperTrend
+        function calculateSuperTrend(high, low, close, period, multiplier) {
+            const hl2 = high.map((h, i) => (h + low[i]) / 2);
+            const atr = calculateATR(high, low, close, period);
+            
+            const upperBand = [];
+            const lowerBand = [];
+            const superTrend = [];
+            const trendDirection = [];
+            
+            for (let i = 0; i < hl2.length; i++) {
+                if (i < atr.length) {
+                    upperBand[i] = hl2[i] + multiplier * atr[i];
+                    lowerBand[i] = hl2[i] - multiplier * atr[i];
+                } else {
+                    upperBand[i] = hl2[i] + multiplier * (atr[atr.length - 1] || 0);
+                    lowerBand[i] = hl2[i] - multiplier * (atr[atr.length - 1] || 0);
+                }
+                
+                if (i === 0) {
+                    superTrend[i] = upperBand[i];
+                    trendDirection[i] = 1;
+                } else {
+                    // Update bands
+                    upperBand[i] = upperBand[i] < upperBand[i-1] || close[i-1] > upperBand[i-1] 
+                        ? upperBand[i] : upperBand[i-1];
+                    lowerBand[i] = lowerBand[i] > lowerBand[i-1] || close[i-1] < lowerBand[i-1] 
+                        ? lowerBand[i] : lowerBand[i-1];
+                    
+                    // Determine trend
+                    if (trendDirection[i-1] === 1 && close[i] <= lowerBand[i]) {
+                        trendDirection[i] = -1;
+                    } else if (trendDirection[i-1] === -1 && close[i] >= upperBand[i]) {
+                        trendDirection[i] = 1;
+                    } else {
+                        trendDirection[i] = trendDirection[i-1];
+                    }
+                    
+                    superTrend[i] = trendDirection[i] === 1 ? lowerBand[i] : upperBand[i];
+                }
+            }
+            
+            return { superTrend, trendDirection };
+        }
+
+        // Fetch available strikes using Python backend
+        async function fetchAvailableStrikes() {
+            const accessToken = document.getElementById('accessToken').value.trim();
+            const clientId = document.getElementById('clientId').value.trim();
+            
+            if (!accessToken || !clientId) {
+                alert('Please enter Access Token and Client ID first');
+                return;
+            }
+            
+            document.getElementById('fetchStrikesBtn').disabled = true;
+            document.getElementById('fetchStrikesBtn').textContent = 'Fetching...';
+            logMessage('Setting credentials and fetching strikes via Python backend...');
+            
+            try {
+                // Set credentials in Python backend
+                const credentialsResponse = await fetch('http://localhost:5000/api/set-credentials', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        access_token: accessToken,
+                        client_id: clientId
+                    })
+                });
+                
+                if (!credentialsResponse.ok) {
+                    throw new Error('Failed to set credentials in backend');
+                }
+                
+                logMessage('Credentials set. Fetching expiry list...');
+                
+                // Get expiry list
+                const expiryResponse = await fetch('http://localhost:5000/api/expiry-list');
+                if (!expiryResponse.ok) {
+                    const error = await expiryResponse.json();
+                    throw new Error(error.error || 'Failed to fetch expiry list');
+                }
+                
+                const expiryData = await expiryResponse.json();
+                if (!expiryData.data || expiryData.data.length === 0) {
+                    throw new Error('No expiry dates found');
+                }
+                
+                currentExpiry = expiryData.data[0];
+                document.getElementById('currentExpiry').textContent = currentExpiry;
+                logMessage(`Using expiry: ${currentExpiry}`);
+                
+                // Get option chain
+                logMessage('Fetching option chain...');
+                const optionChainResponse = await fetch('http://localhost:5000/api/option-chain', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        expiry: currentExpiry
+                    })
+                });
+                
+                if (!optionChainResponse.ok) {
+                    const error = await optionChainResponse.json();
+                    throw new Error(error.error || 'Failed to fetch option chain');
+                }
+                
+                const optionChainData = await optionChainResponse.json();
+                
+                // Process strikes
+                logMessage('Processing strikes...');
+                const processResponse = await fetch('http://localhost:5000/api/process-strikes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        option_chain_data: optionChainData,
+                        expiry: currentExpiry
+                    })
+                });
+                
+                if (!processResponse.ok) {
+                    const error = await processResponse.json();
+                    throw new Error(error.error || 'Failed to process strikes');
+                }
+                
+                const processedData = await processResponse.json();
+                
+                // Update available strikes
+                availableStrikes = processedData.strikes.map(strike => ({
+                    strike: strike.strike,
+                    securityId: strike.security_id,
+                    ltp: strike.ltp,
+                    distanceFromSpot: strike.distance_from_spot,
+                    volume: strike.volume,
+                    oi: strike.oi
+                }));
+                
+                populateStrikeDropdown();
+                
+                logMessage(`Found ${availableStrikes.length} call strikes. NIFTY LTP: ${processedData.nifty_ltp.toFixed(2)}`);
+                logMessage('Note: Security IDs may need manual verification for WebSocket connection.');
+                
+            } catch (error) {
+                logMessage(`Error: ${error.message}`);
+                alert(`Failed to fetch strikes: ${error.message}\n\nMake sure Python server is running on localhost:5000`);
+                showManualEntry();
+            } finally {
+                document.getElementById('fetchStrikesBtn').disabled = false;
+                document.getElementById('fetchStrikesBtn').textContent = 'Refresh Strikes';
+            }
+        }
+        
+        // Populate strike dropdown with enhanced data
+        function populateStrikeDropdown() {
+            const dropdown = document.getElementById('strikeSelect');
+            dropdown.innerHTML = '<option value="">Select a strike...</option>';
+            
+            availableStrikes.forEach((strikeData, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                
+                const atmIndicator = index === 0 ? ' (ATM)' : '';
+                const distance = index === 0 ? '' : ` (${strikeData.distanceFromSpot > 0 ? '+' : ''}${strikeData.distanceFromSpot.toFixed(0)})`;
+                const volume = strikeData.volume ? ` | Vol: ${(strikeData.volume / 1000).toFixed(0)}K` : '';
+                const oi = strikeData.oi ? ` | OI: ${(strikeData.oi / 1000).toFixed(0)}K` : '';
+                
+                option.textContent = `${strikeData.strike} CE - LTP: ${strikeData.ltp.toFixed(2)}${atmIndicator}${distance}${volume}${oi}`;
+                dropdown.appendChild(option);
+            });
+            
+            dropdown.disabled = false;
+            
+            // Auto-select ATM (first option)
+            if (availableStrikes.length > 0) {
+                dropdown.selectedIndex = 1;
+                handleStrikeSelection();
+            }
+        }
+        
+        // Show manual entry section
+        function showManualEntry() {
+            document.getElementById('manualEntrySection').style.display = 'flex';
+            document.getElementById('currentExpiry').textContent = 'Manual Entry Mode';
+        }
+        
+        // Add manual strike entry
+        function addManualStrike() {
+            const strike = document.getElementById('manualStrike').value.trim();
+            const secId = document.getElementById('manualSecId').value.trim();
+            
+            if (!strike || !secId) {
+                alert('Please enter both Strike Price and Security ID');
+                return;
+            }
+            
+            const strikePrice = parseFloat(strike);
+            if (isNaN(strikePrice)) {
+                alert('Please enter a valid strike price');
+                return;
+            }
+            
+            // Add to available strikes
+            availableStrikes = [{
+                strike: strikePrice,
+                securityId: secId,
+                ltp: 0, // Unknown LTP
+                distanceFromSpot: 0
+            }];
+            
+            // Update dropdown
+            const dropdown = document.getElementById('strikeSelect');
+            dropdown.innerHTML = '<option value="">Select a strike...</option>';
+            dropdown.innerHTML += `<option value="0">${strikePrice} CE - Security ID: ${secId}</option>`;
+            dropdown.disabled = false;
+            dropdown.selectedIndex = 1;
+            
+            handleStrikeSelection();
+            
+            logMessage(`Manually added: ${strikePrice} CE with Security ID: ${secId}`);
+            
+            // Clear inputs
+            document.getElementById('manualStrike').value = '';
+            document.getElementById('manualSecId').value = '';
+        }
+        
+        // Populate strike dropdown
+        function populateStrikeDropdown() {
+            const dropdown = document.getElementById('strikeSelect');
+            dropdown.innerHTML = '<option value="">Select a strike...</option>';
+            
+            availableStrikes.forEach((strikeData, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                
+                const atmIndicator = index === 0 ? ' (ATM)' : '';
+                const distance = index === 0 ? '' : ` (${strikeData.distanceFromSpot > 0 ? '+' : ''}${strikeData.distanceFromSpot.toFixed(0)})`;
+                
+                option.textContent = `${strikeData.strike} CE - LTP: ${strikeData.ltp.toFixed(2)}${atmIndicator}${distance}`;
+                dropdown.appendChild(option);
+            });
+            
+            dropdown.disabled = false;
+            
+            // Auto-select ATM (first option)
+            if (availableStrikes.length > 0) {
+                dropdown.selectedIndex = 1; // Index 1 because of the "Select..." option
+                handleStrikeSelection();
+            }
+        }
+        
+        // Handle strike selection
+        function handleStrikeSelection() {
+            const dropdown = document.getElementById('strikeSelect');
+            const selectedIndex = parseInt(dropdown.value);
+            
+            if (isNaN(selectedIndex) || selectedIndex < 0) {
+                document.getElementById('selectedSecId').textContent = 'None';
+                document.getElementById('connectBtn').disabled = true;
+                selectedStrike = null;
+                atmCallSecurityId = null;
+                return;
+            }
+            
+            selectedStrike = availableStrikes[selectedIndex];
+            atmCallSecurityId = selectedStrike.securityId;
+            
+            document.getElementById('selectedSecId').textContent = atmCallSecurityId;
+            document.getElementById('connectBtn').disabled = false;
+            
+            logMessage(`Selected: ${selectedStrike.strike} CE, Security ID: ${atmCallSecurityId}`);
+        }
+
+        // Process WebSocket binary data
+        function processBinaryData(arrayBuffer) {
+            try {
+                const dataView = new DataView(arrayBuffer);
+                
+                // Parse response header (8 bytes for market feed)
+                const feedResponseCode = dataView.getUint8(0);
+                const messageLength = dataView.getUint16(1, true); // little endian
+                const exchangeSegment = dataView.getUint8(3);
+                const securityId = dataView.getUint32(4, true);
+                
+                logMessage(`Received: Code=${feedResponseCode}, Length=${messageLength}, Segment=${exchangeSegment}, SecurityID=${securityId}`);
+                
+                // Process different packet types
+                if (feedResponseCode === 2) { // Ticker packet
+                    const ltp = dataView.getFloat32(8, true);
+                    const ltt = dataView.getUint32(12, true);
+                    
+                    logMessage(`Ticker: LTP=${ltp}, LTT=${ltt}`);
+                    updatePriceData(ltp);
+                    
+                } else if (feedResponseCode === 4) { // Quote packet
+                    const ltp = dataView.getFloat32(8, true);
+                    const ltq = dataView.getUint16(12, true);
+                    const ltt = dataView.getUint32(14, true);
+                    
+                    logMessage(`Quote: LTP=${ltp}, LTQ=${ltq}, LTT=${ltt}`);
+                    updatePriceData(ltp);
+                    
+                } else if (feedResponseCode === 6) { // Previous close
+                    const prevClose = dataView.getFloat32(8, true);
+                    const prevOI = dataView.getUint32(12, true);
+                    
+                    logMessage(`Prev Close: ${prevClose}, Prev OI: ${prevOI}`);
+                }
+                
+                messageCount++;
+                document.getElementById('msgCount').textContent = messageCount;
+                
+            } catch (error) {
+                logMessage(`Error processing binary data: ${error.message}`);
+            }
+        }
+
+        // Update price data and calculate SuperTrend
+        function updatePriceData(ltp) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-IN', { 
+                timeZone: 'Asia/Kolkata',
+                hour12: false 
+            });
+            
+            // Add new data point
+            optionsData.timestamps.push(timeStr);
+            optionsData.atmCallPrices.push(ltp);
+            
+            // Simulate high/low for SuperTrend calculation
+            const high = ltp * 1.001; // Small variation
+            const low = ltp * 0.999;
+            
+            optionsData.high.push(high);
+            optionsData.low.push(low);
+            optionsData.close.push(ltp);
+            
+            // Keep only last 200 points
+            const maxPoints = 200;
+            if (optionsData.timestamps.length > maxPoints) {
+                optionsData.timestamps.shift();
+                optionsData.atmCallPrices.shift();
+                optionsData.high.shift();
+                optionsData.low.shift();
+                optionsData.close.shift();
+            }
+            
+            // Calculate SuperTrend if we have enough data
+            if (optionsData.close.length >= 20) {
+                const period = parseInt(document.getElementById('stPeriod').value);
+                const multiplier = parseFloat(document.getElementById('stMultiplier').value);
+                
+                const { superTrend, trendDirection } = calculateSuperTrend(
+                    optionsData.high, 
+                    optionsData.low, 
+                    optionsData.close, 
+                    period, 
+                    multiplier
+                );
+                
+                // Clear previous SuperTrend data
+                optionsData.superTrendUp = [];
+                optionsData.superTrendDown = [];
+                
+                // Split SuperTrend into up and down arrays
+                for (let i = 0; i < superTrend.length; i++) {
+                    if (trendDirection[i] === 1) {
+                        optionsData.superTrendUp.push(superTrend[i]);
+                        optionsData.superTrendDown.push(null);
+                    } else {
+                        optionsData.superTrendUp.push(null);
+                        optionsData.superTrendDown.push(superTrend[i]);
+                    }
+                }
+                
+                // Update signal
+                const currentSignal = trendDirection[trendDirection.length - 1] === 1 ? 'BULLISH' : 'BEARISH';
+                document.getElementById('stSignal').textContent = currentSignal;
+                document.getElementById('stSignal').className = currentSignal === 'BULLISH' ? 'status-value price-positive' : 'status-value price-negative';
+            }
+            
+            // Update UI
+            document.getElementById('atmCallLtp').textContent = ltp.toFixed(2);
+            document.getElementById('lastUpdate').textContent = timeStr;
+            
+            // Update chart
+            chart.data.labels = optionsData.timestamps;
+            chart.data.datasets[0].data = optionsData.atmCallPrices;
+            chart.data.datasets[1].data = optionsData.superTrendUp;
+            chart.data.datasets[2].data = optionsData.superTrendDown;
+            
+            chart.update('none');
+        }
+
+        // Log messages
+        function logMessage(message) {
+            const logContainer = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // Keep only last 50 log entries
+            while (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+
+        // Connect to WebSocket
+        function connectWebSocket() {
+            const accessToken = document.getElementById('accessToken').value.trim();
+            const clientId = document.getElementById('clientId').value.trim();
+            
+            if (!accessToken || !clientId) {
+                alert('Please enter both Access Token and Client ID');
+                return;
+            }
+            
+            if (!selectedStrike || !atmCallSecurityId) {
+                alert('Please select a strike price first by clicking "Fetch Available Strikes"');
+                return;
+            }
+            
+            document.getElementById('currentStrike').textContent = selectedStrike.strike;
+            
+            const wsUrl = `wss://api-feed.dhan.co?version=2&token=${accessToken}&clientId=${clientId}&authType=2`;
+            
+            try {
+                updateConnectionStatus('connecting');
+                logMessage('Connecting to DhanHQ WebSocket...');
+                
+                websocket = new WebSocket(wsUrl);
+                
+                websocket.onopen = function() {
+                    logMessage('WebSocket connected successfully');
+                    updateConnectionStatus('connected');
+                    
+                    // Subscribe to ATM call option
+                    const subscribeMessage = {
+                        RequestCode: 15, // Subscribe to quote data
+                        InstrumentCount: 1,
+                        InstrumentList: [
+                            {
+                                ExchangeSegment: "NSE_FNO",
+                                SecurityId: atmCallSecurityId.toString()
+                            }
+                        ]
+                    };
+                    
+                    websocket.send(JSON.stringify(subscribeMessage));
+                    logMessage(`Subscribed to ${selectedStrike.strike} CE: SecurityID=${atmCallSecurityId}`);
+                    
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                };
+                
+                websocket.onmessage = function(event) {
+                    if (event.data instanceof ArrayBuffer) {
+                        processBinaryData(event.data);
+                    } else {
+                        logMessage(`Text message received: ${event.data}`);
+                    }
+                };
+                
+                websocket.onclose = function(event) {
+                    logMessage(`WebSocket closed: Code=${event.code}, Reason=${event.reason}`);
+                    updateConnectionStatus('disconnected');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = false;
+                };
+                
+                websocket.onerror = function(error) {
+                    logMessage(`WebSocket error: ${error.message || 'Unknown error'}`);
+                    updateConnectionStatus('disconnected');
+                };
+                
+            } catch (error) {
+                logMessage(`Connection error: ${error.message}`);
+                updateConnectionStatus('disconnected');
+            }
+        }
+
+        // Disconnect WebSocket
+        function disconnectWebSocket() {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                // Send disconnect message
+                const disconnectMessage = { RequestCode: 12 };
+                websocket.send(JSON.stringify(disconnectMessage));
+                
+                websocket.close();
+                logMessage('WebSocket disconnected');
+            }
+            
+            updateConnectionStatus('disconnected');
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+        }
+
+        // Update connection status
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.className = `connection-status ${status}`;
+            
+            switch (status) {
+                case 'connected':
+                    statusElement.textContent = 'Connected';
+                    isConnected = true;
+                    break;
+                case 'connecting':
+                    statusElement.textContent = 'Connecting...';
+                    isConnected = false;
+                    break;
+                case 'disconnected':
+                    statusElement.textContent = 'Disconnected';
+                    isConnected = false;
+                    break;
+            }
+        }
+
+        // Event listeners
+        document.getElementById('fetchStrikesBtn').addEventListener('click', fetchAvailableStrikes);
+        document.getElementById('manualEntryBtn').addEventListener('click', showManualEntry);
+        document.getElementById('addManualStrike').addEventListener('click', addManualStrike);
+        document.getElementById('strikeSelect').addEventListener('change', handleStrikeSelection);
+        document.getElementById('connectBtn').addEventListener('click', connectWebSocket);
+        document.getElementById('disconnectBtn').addEventListener('click', disconnectWebSocket);
+        
+        document.getElementById('stPeriod').addEventListener('change', () => {
+            if (optionsData.close.length >= 20) {
+                // Recalculate SuperTrend with new parameters
+                const lastPrice = optionsData.atmCallPrices[optionsData.atmCallPrices.length - 1];
+                if (lastPrice) {
+                    updatePriceData(lastPrice);
+                }
+            }
+        });
+
+        document.getElementById('stMultiplier').addEventListener('change', () => {
+            if (optionsData.close.length >= 20) {
+                // Recalculate SuperTrend with new parameters
+                const lastPrice = optionsData.atmCallPrices[optionsData.atmCallPrices.length - 1];
+                if (lastPrice) {
+                    updatePriceData(lastPrice);
+                }
+            }
+        });
+
+        // Initialize
+        window.onload = function() {
+            initChart();
+            logMessage('Application initialized. Ready to connect to DhanHQ WebSocket.');
+        };
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (websocket) {
+                disconnectWebSocket();
+            }
+        });
+    </script>
+</body>
+</html>
