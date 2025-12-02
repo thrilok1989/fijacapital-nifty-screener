@@ -38,3 +38,29 @@ rich==13.5.2
 # Trading specific
 mibian==1.0.0
 pytz==2023.3
+
+# Core Streamlit dependencies
+streamlit==1.28.0
+plotly==5.17.0
+pandas==2.0.3
+numpy==1.24.3
+
+# Trading system dependencies (same as before)
+dhanhq==1.0.0
+supabase==1.0.3
+xgboost==1.7.6
+scikit-learn==1.3.0
+ta-lib==0.4.26
+groq==0.5.0
+langchain-groq==0.0.2
+langchain==0.1.0
+python-telegram-bot==20.3
+newspaper3k==0.2.8
+newsapi-python==0.2.7
+aiohttp==3.8.5
+python-dotenv==1.0.0
+
+# Additional for Streamlit
+streamlit-option-menu==0.3.6
+streamlit-extras==0.3.0
+altair==5.1.2
